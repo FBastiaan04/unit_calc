@@ -16,7 +16,8 @@ fn process_eq(variables: &HashMap<String, ValueUnit>, input: String) -> Result<V
     let mut buffer = String::new();
     let mut was_previous_value_sub_eq = false;
     let mut previous_char = '0';
-    for c in input.chars() {
+    let mut chars = input.chars().peekable();
+    while let Some(c) = chars.next() {
         if c == ')' {
             if brackets_sum > 1 {
                 buffer.push(c);
@@ -25,7 +26,7 @@ fn process_eq(variables: &HashMap<String, ValueUnit>, input: String) -> Result<V
                 return Err("Unmatched closing bracket")
             }
             brackets_sum -= 1;
-        } else if brackets_sum == 0 && operators.contains(c) && previous_char == ' ' { // If we are outside of brackets and find an operator after a space
+        } else if brackets_sum == 0 && operators.contains(c) && previous_char == ' ' && chars.peek() == Some(&' ') { // If we are outside of brackets and find an operator after a space
             // println!("buffer = |{buffer}|");
             if was_previous_value_sub_eq { // If the buffer is a sub eq, process it (recursion)
                 values.push(process_eq(variables, buffer)?);
@@ -61,8 +62,8 @@ fn process_eq(variables: &HashMap<String, ValueUnit>, input: String) -> Result<V
 
     let operator_functions: [(char, fn(ValueUnit, ValueUnit) -> Result<ValueUnit, &'static str>); 5] = [// these are in order of operation
         ('^', |left, right| {
-            if right.value > 1.0 {
-                let pow = right.value.round().rem_euclid(2f64.powi(32)) as i8;
+            if right.value.abs() >= 1.0 {
+                let pow = right.value.round() as i8;
                 return Ok(left.pow(pow));
             } else {
                 let pow = (1.0_f64 / right.value).round().rem_euclid(2f64.powi(32)) as i8;
