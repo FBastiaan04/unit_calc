@@ -100,7 +100,7 @@ fn is_valid_var_name(var_name: &String) -> bool {
             return false
         }
         for char in var_name_iter {
-            if !(97..=122).contains(&char) && !(48..=57).contains(&char) && char != 95 {
+            if !(97..=122).contains(&char) && !(48..=57).contains(&char) && char != 95 { //any alphanumaric or underscore
                 return false
             }
         }
@@ -131,7 +131,7 @@ fn main() {
                 let mut var_name_and_var_eq = input.split('=');
                 let var_name = var_name_and_var_eq.next().unwrap().trim().to_string();
                 if !is_valid_var_name(&var_name) {
-                    println!("Error: variable names must be alphanumeric and start with a letter");
+                    println!("Error: variable names must be alphanumeric and start with an alphabetic character");
                     continue;
                 }
                 let var_eq = var_name_and_var_eq.next().unwrap().trim().to_string();
