@@ -1,33 +1,46 @@
 use std::{collections::HashMap, io::Write};
 use value_unit::{self, ValueUnit, TryAdd, TrySub};
 
-fn process_eq(variables: &HashMap<String, ValueUnit>, input: String) -> Result<ValueUnit, &'static str> {
-    // println!("input: {input}");
+// These are all the operators in order
+const OPERATOR_FUNCTIONS: [(char, fn(ValueUnit, ValueUnit) -> Result<ValueUnit, String>); 5] = [
+    ('^', |left, right| {
+        if right.value.abs() >= 1.0 {
+            let pow = right.value.round() as i8;
+            return Ok(left.pow(pow));
+        } else {
+            let pow = (1.0_f64 / right.value).round().rem_euclid(2f64.powi(32)) as i8;
+            return Ok(left.root(pow));
+        }
+    }),
+    ('/', |left, right| Ok(&left / &right)),
+    ('*', |left, right| Ok(&left * &right)),
+    ('-', |left, right| (&left).try_sub(&right)),
+    ('+', |left, right| (&left).try_add(&right))
+];
+
+
+
+fn process_eq(variables: &HashMap<String, ValueUnit>, input: String) -> Result<ValueUnit, String> {
     // split equation into array of ValueUnits and an array of operators
-    /*
-    let re = Regex::new(r"\s([*+\-/\^])\s").unwrap();
-    let mut values: Vec<ValueUnit> = re.split(&input).map(|x| x.to_string().try_into()).collect::<Result<Vec<ValueUnit>, &'static str>>()?;
-    let mut ops: Vec<char> = re.captures_iter(&input).map(|cap| cap.get(0).unwrap().as_str().chars().nth(1).unwrap()).collect();
-    */
     let mut values: Vec<ValueUnit> = Vec::new();
     let mut ops = Vec::new();
     let operators = "*+-/^";
-    let mut brackets_sum: u8 = 0;
+    let mut brackets_sum: u8 = 0; // This keeps track of the opened brackets minus the closed ones
     let mut buffer = String::new();
     let mut was_previous_value_sub_eq = false;
     let mut previous_char = '0';
     let mut chars = input.chars().peekable();
     while let Some(c) = chars.next() {
+        // This code deals with brackets and sub equations. Sub equations get evaluated first
         if c == ')' {
             if brackets_sum > 1 {
                 buffer.push(c);
             }
             if brackets_sum < 1 {
-                return Err("Unmatched closing bracket")
+                return Err("Unmatched closing bracket".to_string())
             }
             brackets_sum -= 1;
         } else if brackets_sum == 0 && operators.contains(c) && previous_char == ' ' && chars.peek() == Some(&' ') { // If we are outside of brackets and find an operator after a space
-            // println!("buffer = |{buffer}|");
             if was_previous_value_sub_eq { // If the buffer is a sub eq, process it (recursion)
                 values.push(process_eq(variables, buffer)?);
                 was_previous_value_sub_eq = false;
@@ -49,7 +62,6 @@ fn process_eq(variables: &HashMap<String, ValueUnit>, input: String) -> Result<V
         }
         previous_char = c;
     }
-    // println!("buffer: |{buffer}|");
     if was_previous_value_sub_eq {
         values.push(process_eq(variables, buffer)?);
     } else if variables.contains_key(buffer.trim()) {
@@ -57,26 +69,10 @@ fn process_eq(variables: &HashMap<String, ValueUnit>, input: String) -> Result<V
     } else {
         values.push(buffer.try_into()?);
     }
-    // println!("{:#?} {:#?}", ops, values);
     assert_eq!(ops.len() + 1, values.len());
 
-    let operator_functions: [(char, fn(ValueUnit, ValueUnit) -> Result<ValueUnit, &'static str>); 5] = [// these are in order of operation
-        ('^', |left, right| {
-            if right.value.abs() >= 1.0 {
-                let pow = right.value.round() as i8;
-                return Ok(left.pow(pow));
-            } else {
-                let pow = (1.0_f64 / right.value).round().rem_euclid(2f64.powi(32)) as i8;
-                return Ok(left.root(pow));
-            }
-        }),
-        ('/', |left, right| Ok(&left / &right)),
-        ('*', |left, right| Ok(&left * &right)),
-        ('-', |left, right| (&left).try_sub(&right)),
-        ('+', |left, right| (&left).try_add(&right))
-    ];
-
-    for (operator, operator_function) in operator_functions {
+	// This does all operations in order of operation due to the order of the list and left to right due to the position function
+    for (operator, operator_function) in OPERATOR_FUNCTIONS {
         while ops.contains(&operator) {
             if let Some(index) = ops.iter().position(|c| c == &operator) {
                 let left = values.remove(index);
@@ -84,7 +80,7 @@ fn process_eq(variables: &HashMap<String, ValueUnit>, input: String) -> Result<V
                 ops.remove(index);
                 values.insert(index, operator_function(left, right)?)
             } else {
-                unreachable!();
+                unreachable!(); // We just detemined it does contain the operator
             }
         }
     }
@@ -117,18 +113,22 @@ fn main() {
         std::io::stdout().flush().unwrap();
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).expect("Failed to read line");
-        if input.trim() == "exit" {
+		let input_str = input.trim();
+        if input_str == "exit" {
             break;
         }
-        match input.matches('=').count() {
+		if input_str == "" {
+			continue;
+		}
+        match input_str.matches('=').count() {
             0 => {
-                match process_eq(&variables, input.trim().to_string()) {
+                match process_eq(&variables, input_str.to_string()) {
                     Err(e) => println!("Error: {e}"),
                     Ok(res) => println!("{res}"),
                 }
             },
             1 => {
-                let mut var_name_and_var_eq = input.split('=');
+                let mut var_name_and_var_eq = input_str.split('=');
                 let var_name = var_name_and_var_eq.next().unwrap().trim().to_string();
                 if !is_valid_var_name(&var_name) {
                     println!("Error: variable names must be alphanumeric and start with an alphabetic character");
