@@ -7,5 +7,4 @@ edition = "2021"
 
 [dependencies]
 regex = "1.7.1"
-value_unit = { path = "C:\\Users\\flori\\OneDrive\\Bureaublad\\desktop-files\\rust\\value_unit" }
-# value_unit = "0.1.1"
+value_unit = "0.1.2"
